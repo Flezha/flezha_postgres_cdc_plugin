@@ -2,7 +2,7 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
   @moduledoc """
   What the package's tests need from a running controller and nothing more: a
   poll, a telemetry capture, a plugin prepared and activated as the extension
-  table does it, a stand-in operator, and the dev database.
+  table does it, a stand-in relay, and the dev database.
   """
 
   import ExUnit.Callbacks, only: [on_exit: 1]
@@ -81,7 +81,7 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
         %{
           overwatcher_pid: self(),
           source_namespace: :default,
-          source_operator_id: "op",
+          source_relay_id: "op",
           source_plugin_id: "cdc",
           subscribed_extensions: [:on_terminate]
         },
@@ -122,7 +122,7 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
   end
 
   @doc """
-  The host operator of a feeding worker, linked to the caller: it answers each
+  The host relay of a feeding worker, linked to the caller: it answers each
   ingest with the verdict `verdict.(body, metadata)` gives, `:ok` by default,
   and tells the caller `{:ingest, body, metadata}` for every one it takes, and
   `{:persist, key, value}` for every option the worker commits. With `absorb:

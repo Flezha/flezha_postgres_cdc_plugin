@@ -140,7 +140,7 @@ defmodule FlezhaPostgresCdc.Reader do
   def handle_info({:copy, :refused, reason}, state), do: {:noreply, copy_refused(state, reason)}
   def handle_info({:copy, :taken}, state), do: {:noreply, recovered(state, :taken)}
 
-  # The stream answered its first message, or the operator took its first batch.
+  # The stream answered its first message, or the relay took its first batch.
   def handle_info({:streaming, stream, what}, %{stream: stream} = state),
     do: {:noreply, recovered(state, what)}
 
@@ -187,7 +187,7 @@ defmodule FlezhaPostgresCdc.Reader do
     :ok
   end
 
-  # The operator this reader feeds is gone.
+  # The relay this reader feeds is gone.
   defp host_down(state, ref) do
     case Watch.down(state.watch, ref) do
       {[:host], _watch} -> {:stop, :normal, state}
@@ -351,7 +351,7 @@ defmodule FlezhaPostgresCdc.Reader do
       )
 
   # Connected again clears the failure; the backoff starts over only once the
-  # operator takes something, so a refusing operator is not re-fed at once.
+  # relay takes something, so a refusing relay is not re-fed at once.
   defp recovered(state, :failure), do: %{state | failure: nil}
   defp recovered(state, :taken), do: %{state | refusals: 0, last_error: nil, attempt: 0}
 

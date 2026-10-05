@@ -1,7 +1,7 @@
 defmodule FlezhaPostgresCdc.StreamTest do
   @moduledoc """
   The replication connection's callbacks driven with recorded `pgoutput`
-  messages and a stand-in operator: the events, the batches, the confirmed
+  messages and a stand-in relay: the events, the batches, the confirmed
   position and a refusal. No database is involved.
   """
   use ExUnit.Case, async: false

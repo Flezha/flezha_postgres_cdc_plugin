@@ -38,7 +38,7 @@ defmodule FlezhaPostgresCdc.ProviderTest do
   end
 
   test "a member of a partition group and a plugin with no channel are refused" do
-    assert {:error, {:partitioned_host, %{provider: "postgres_cdc", operator: "op"}}} =
+    assert {:error, {:partitioned_host, %{provider: "postgres_cdc", relay: "op"}}} =
              prepare(@base, %{partition_count: 4})
 
     assert {:error, {:entry_channel_required, "postgres_cdc"}} =

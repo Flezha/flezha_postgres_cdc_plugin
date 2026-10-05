@@ -231,12 +231,12 @@ defmodule FlezhaPostgresCdc.Stream do
   end
 
   # A status after every hand-over keeps the server from ending a connection
-  # that waited on a slow operator.
+  # that waited on a slow relay.
   defp with_status([], state), do: [Pgoutput.status(state.committed)]
   defp with_status(acks, _state), do: acks
 
   # The reader is told once that the stream works (`:failure` is over) and once
-  # that the operator takes its changes (`:taken`, the refusals are over).
+  # that the relay takes its changes (`:taken`, the refusals are over).
   defp tell(state, what) do
     if what in state.told do
       state

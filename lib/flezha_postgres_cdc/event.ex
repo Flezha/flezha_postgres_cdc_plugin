@@ -1,6 +1,6 @@
 defmodule FlezhaPostgresCdc.Event do
   @moduledoc """
-  A row change as the input the operator receives, and its hand-over.
+  A row change as the input the relay receives, and its hand-over.
 
   The payload is one JSON object: `op`, `schema`, `table`, `before`, `after`,
   `unchanged`, `lsn`, `xid`, `commit_time` and `seq` (a truncate carries
@@ -16,7 +16,7 @@ defmodule FlezhaPostgresCdc.Event do
   alias FlezhaPostgresCdc.Pgoutput
   alias FlezhaPostgresCdc.Values
 
-  # How long one hand-over waits for the operator's verdicts. Well under the
+  # How long one hand-over waits for the relay's verdicts. Well under the
   # server's `wal_sender_timeout` (60 s by default), which ends a replication
   # connection that answers nothing for that long.
   @inject_timeout_ms 20_000
@@ -58,7 +58,7 @@ defmodule FlezhaPostgresCdc.Event do
   end
 
   @doc """
-  Hand `inputs` to the operator and wait for every verdict: `:ok` when it took
+  Hand `inputs` to the relay and wait for every verdict: `:ok` when it took
   them all, else the first refusal. A hand-over that outlasts its timeout is a
   refusal.
   """

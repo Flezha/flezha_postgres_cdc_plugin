@@ -2,11 +2,11 @@ defmodule FlezhaPostgresCdc do
   @moduledoc """
   The `postgres_cdc` provider: the row changes of a Postgres publication read
   from the database's write-ahead log through a logical replication slot, each
-  one input on the operator's entry channel, after a first copy of the
+  one input on the relay's entry channel, after a first copy of the
   published tables.
 
   Each binding runs one `FlezhaPostgresCdc.Reader`. One slot per binding: not
-  shareable, and refused on a partitioned operator, whose members a row's key
+  shareable, and refused on a partitioned relay, whose members a row's key
   decides between. The slot is kept on every disable, since dropping it loses
   the position. Options, the event, the copy, acknowledgement, health and
   telemetry: `docs/plugins/postgres_cdc.md` in the core.
@@ -67,7 +67,7 @@ defmodule FlezhaPostgresCdc do
             default: 5_000,
             min: 1,
             doc:
-              "Longest the read position waits to be confirmed while changes stream, unless the operator's input is durable"
+              "Longest the read position waits to be confirmed while changes stream, unless the relay's input is durable"
           ],
           max_lag_bytes: [
             type: :int,
@@ -162,7 +162,7 @@ defmodule FlezhaPostgresCdc do
   defp verdict(%{failure: failure}, _opts) when failure != nil, do: {:unhealthy, failure}
 
   # The log a slot holds back fills the database server's disk: it outranks a
-  # refusing operator, which is what usually makes it grow.
+  # refusing relay, which is what usually makes it grow.
   defp verdict(%{lag_bytes: bytes}, opts) when is_integer(bytes) and bytes > opts.max_lag_bytes,
     do:
       {:unhealthy,
@@ -174,7 +174,7 @@ defmodule FlezhaPostgresCdc do
 
   defp verdict(_facts, _opts), do: :healthy
 
-  @doc "What `flz operator info` shows beneath the plugin: the slot, the publication and its verdict."
+  @doc "What `flz relay info` shows beneath the plugin: the slot, the publication and its verdict."
   @impl true
   def inspect_state(opts),
     do: %{slot: opts.slot, publication: opts.publication, health: health(opts)}

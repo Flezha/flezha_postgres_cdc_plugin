@@ -7,7 +7,7 @@ defmodule FlezhaPostgresCdc.Copy do
   One `REPEATABLE READ, READ ONLY` transaction adopts the snapshot; each table
   is read through a server-side cursor, `snapshot_batch` rows at a time,
   ordered by its key, its columns selected as the poll source selects them.
-  Each batch is handed to the operator and waited for; a refused batch is
+  Each batch is handed to the relay and waited for; a refused batch is
   handed over again along the reader's backoff curve, the cursor and the
   snapshot held meanwhile, and the reader is told of every refusal. The
   transaction holds back vacuum on the whole database while it runs.

@@ -40,7 +40,7 @@ controller_env() {
   export FLEZHA_STATE_DIR=$1/state
   export FLEZHA_PLUGIN_ROOT=$1/plugins
   export FLEZHA_AUTHZ_ENABLED=false
-  # The file sink the relay's outputs are written by, and the password the plugin reads.
+  # The file sink the runner's outputs are written by, and the password the plugin reads.
   export FLEZHA_FILE_PLUGIN_ROOT=$1/files
   export CDC_E2E_PASSWORD=flezha_test
   FLEZHA_HEALTHZ_PORT=$(free_port) FLEZHA_PROMETHEUS_PORT=$(free_port) FLEZHA_TESTNET_WS_PORT=$(free_port)
@@ -77,18 +77,18 @@ stop_controller() {
   until_ok 30 "! pgrep -f 'beam.smp.* $FLEZHA_NODE_NAME@'" || pkill -KILL -f "beam.smp.* $FLEZHA_NODE_NAME@"
 }
 
-build_relay() {
-  (cd "$HERE/relay" && mix deps.get && mix compile) >"$TMP/out/relay-build.log" 2>&1 ||
-    { cat "$TMP/out/relay-build.log"; exit 1; }
+build_runner() {
+  (cd "$HERE/runner" && mix deps.get && mix compile) >"$TMP/out/runner-build.log" 2>&1 ||
+    { cat "$TMP/out/runner-build.log"; exit 1; }
 }
 
-# `start_runner <name> <namespace>`: the relay fixture as a runner of the
+# `start_runner <name> <namespace>`: the e2e runner as a runner of the
 # controller whose environment is set. Its standard input stays open until
 # `stop_runner`, whose closing it reads as its stop.
 start_runner() {
   mkfifo "$TMP/$1.in"
   (sleep infinity >"$TMP/$1.in" & echo $! >"$TMP/$1.hold")
-  (cd "$HERE/relay" && FLEZHA_RUNNER_ID_PATH="$TMP/runner-id-$1" \
+  (cd "$HERE/runner" && FLEZHA_RUNNER_ID_PATH="$TMP/runner-id-$1" \
     setsid mix run --no-compile --no-deps-check --no-halt -- "$2" <"$TMP/$1.in" >"$TMP/out/$1.log" 2>&1 &
     echo $! >"$TMP/$1.pid")
 }
@@ -101,10 +101,10 @@ stop_runner() {
   until_ok 10 "! kill -0 $pid" || kill -KILL -- "-$pid" 2>/dev/null
 }
 
-# `start_operator <factory> <id>`, retried until the runner serves the factory.
-start_operator() {
+# `start_relay <factory> <id>`, retried until the runner serves the factory.
+start_relay() {
   for _ in $(seq 60); do
-    flz operator start "$1" --id "$2" >>"$TMP/out/start-$2.log" 2>&1 && return 0
+    flz relay start "$1" --id "$2" >>"$TMP/out/start-$2.log" 2>&1 && return 0
     sleep 1
   done
   say "$2 did not start: $(tail -3 "$TMP/out/start-$2.log")"
@@ -121,30 +121,30 @@ table() {
     sql "CREATE PUBLICATION $1_pub FOR TABLE $1" >/dev/null
 }
 
-# `cdc <name> <table> <operator> [X<key>=<value>...]`: a postgres_cdc plugin reading the
-# table's publication through the slot `<name>` onto the operator's entry channel `in`.
+# `cdc <name> <table> <relay> [X<key>=<value>...]`: a postgres_cdc plugin reading the
+# table's publication through the slot `<name>` onto the relay's entry channel `in`.
 cdc() {
   local name=$1 table=$2 op=$3
   shift 3
   flz plugin enable "$name" postgres_cdc Xhostname=localhost "Xport=$DB_PORT" Xdatabase=flezha_test \
     Xusername=flezha Xpassword_env=CDC_E2E_PASSWORD "Xslot=$name" "Xpublication=${table}_pub" \
     Xchannel=in "$@" >>"$TMP/out/enable-$name.log" 2>&1 &&
-    flz plugin bind "$name" --operator_id "$op" --hook=on_terminate >>"$TMP/out/bind-$name.log" 2>&1 ||
+    flz plugin bind "$name" --relay_id "$op" --hook=on_terminate >>"$TMP/out/bind-$name.log" 2>&1 ||
     { cat "$TMP/out/enable-$name.log" "$TMP/out/bind-$name.log"; exit 1; }
 }
 
-# `sink <operator>`: a file sink writing the operator's outputs to `<operator>.out`.
+# `sink <relay>`: a file sink writing the relay's outputs to `<relay>.out`.
 sink() {
-  flz plugin enable "$1_out" operator_file_sink "Xpath=$1.out" >>"$TMP/out/enable-$1_out.log" 2>&1 &&
-    flz plugin bind "$1_out" --operator_id "$1" --hook=on_output >>"$TMP/out/bind-$1_out.log" 2>&1 ||
+  flz plugin enable "$1_out" relay_file_sink "Xpath=$1.out" >>"$TMP/out/enable-$1_out.log" 2>&1 &&
+    flz plugin bind "$1_out" --relay_id "$1" --hook=on_output >>"$TMP/out/bind-$1_out.log" 2>&1 ||
     { cat "$TMP/out/enable-$1_out.log" "$TMP/out/bind-$1_out.log"; exit 1; }
 }
 
-# The distinct identities the operator wrote, and the most times it saw any one.
+# The distinct identities the relay wrote, and the most times it saw any one.
 ids() { cut -d' ' -f1 "$FLEZHA_FILE_PLUGIN_ROOT/$1.out" 2>/dev/null | sort -u | wc -l; }
 most_seen() { cut -d' ' -f2 "$FLEZHA_FILE_PLUGIN_ROOT/$1.out" 2>/dev/null | sort -n | tail -1; }
 
-# `await_ids <operator> <n> [seconds]`: wait until the operator wrote `n` identities.
+# `await_ids <relay> <n> [seconds]`: wait until the relay wrote `n` identities.
 await_ids() { until_ok "${3:-60}" "[ \"\$(ids $1)\" -ge $2 ]"; }
 
 # `active <slot>`: the slot is held by a replication connection.

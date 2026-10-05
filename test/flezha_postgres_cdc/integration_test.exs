@@ -1,7 +1,7 @@
 defmodule FlezhaPostgresCdc.IntegrationTest do
   @moduledoc """
   The provider against the dev stack's `postgres-cdc` (logical replication on,
-  host port 5434), with a stand-in operator: the copy, the stream, the event,
+  host port 5434), with a stand-in relay: the copy, the stream, the event,
   the position, the checks, the lag and the slot's life.
 
       docker compose -f ../../docker/dev/docker-compose.yml up -d postgres-cdc
@@ -526,7 +526,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
   end
 
   describe "the slot's lag and the password" do
-    test "a stalled operator: unhealthy past max_lag_bytes, healthy once it catches up", ctx do
+    test "a stalled relay: unhealthy past max_lag_bytes, healthy once it catches up", ctx do
       table!(ctx, "id int PRIMARY KEY, v text")
       stalled = :atomics.new(1, [])
       :atomics.put(stalled, 1, 1)
