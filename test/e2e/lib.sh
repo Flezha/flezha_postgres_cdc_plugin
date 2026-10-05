@@ -40,7 +40,7 @@ controller_env() {
   export FLEZHA_STATE_DIR=$1/state
   export FLEZHA_PLUGIN_ROOT=$1/plugins
   export FLEZHA_AUTHZ_ENABLED=false
-  # The file sink the runner's outputs are written by, and the password the plugin reads.
+  # The file output plugin the runner's outputs are written by, and the password the plugin reads.
   export FLEZHA_FILE_PLUGIN_ROOT=$1/files
   export CDC_E2E_PASSWORD=flezha_test
   FLEZHA_HEALTHZ_PORT=$(free_port) FLEZHA_PROMETHEUS_PORT=$(free_port) FLEZHA_TESTNET_WS_PORT=$(free_port)
@@ -133,9 +133,9 @@ cdc() {
     { cat "$TMP/out/enable-$name.log" "$TMP/out/bind-$name.log"; exit 1; }
 }
 
-# `sink <relay>`: a file sink writing the relay's outputs to `<relay>.out`.
-sink() {
-  flz plugin enable "$1_out" relay_file_sink "Xpath=$1.out" >>"$TMP/out/enable-$1_out.log" 2>&1 &&
+# `write_outputs <relay>`: a file output plugin writing the relay's outputs to `<relay>.out`.
+write_outputs() {
+  flz plugin enable "$1_out" relay_file_output "Xpath=$1.out" >>"$TMP/out/enable-$1_out.log" 2>&1 &&
     flz plugin bind "$1_out" --relay_id "$1" --hook=on_output >>"$TMP/out/bind-$1_out.log" 2>&1 ||
     { cat "$TMP/out/enable-$1_out.log" "$TMP/out/bind-$1_out.log"; exit 1; }
 }

@@ -1,7 +1,7 @@
 defmodule E2eRunner do
   @moduledoc """
   The relays the end-to-end run binds to the Postgres change capture plugin.
-  Each writes one line per event on the sink `out`: the event's identity, a
+  Each writes one line per event on the output `out`: the event's identity, a
   copied row's table and id or a change's LSN and position.
 
     * `echo` (flow, at least once): the identity alone.
@@ -19,7 +19,7 @@ defmodule E2eRunner do
 
   defmodule Echo do
     @moduledoc false
-    use Flezha.SDK.Relay, factory_id: "echo", input: "in", sink: "out"
+    use Flezha.SDK.Relay, factory_id: "echo", input: "in", output: "out"
 
     def run(input, state, ctx) do
       emit(ctx, E2eRunner.identity(input))
@@ -34,7 +34,7 @@ defmodule E2eRunner do
     @impl true
     def init_state(_key), do: %{}
 
-    # A keyed sink refuses a plain `emit`; the identity is the output's key.
+    # A keyed output refuses a plain `emit`; the identity is the output's key.
     @impl true
     def run(input, seen, ctx) do
       id = E2eRunner.identity(input)
@@ -51,6 +51,6 @@ defmodule E2eRunner do
     use Flezha.SDK.Relay, factory_id: "count_once", run: {:flow, exactly: :effectively_once}
 
     @impl true
-    def channels(c), do: c |> input("in") |> into(E2eRunner.CountTask) |> keyed() |> sink("out")
+    def channels(c), do: c |> input("in") |> into(E2eRunner.CountTask) |> keyed() |> output("out")
   end
 end

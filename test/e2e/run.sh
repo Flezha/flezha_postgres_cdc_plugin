@@ -64,7 +64,7 @@ check_b() {
   local t=e2e_plain_$RUN
   table "$t" 1000 || { fail b "no table"; return; }
   start_relay echo plain
-  sink plain
+  write_outputs plain
   cdc "$t" "$t" plain
   await_ids plain 1000 || { fail b "the copy wrote $(ids plain) of 1000"; return; }
   sql "INSERT INTO $t SELECT g, 'new' FROM generate_series(1001, 2000) g" >/dev/null
@@ -80,7 +80,7 @@ check_c() {
   local t=e2e_copy_$RUN seen
   table "$t" 20000 || { fail c "no table"; return; }
   start_relay count_once copied
-  sink copied
+  write_outputs copied
   stop_runner runner
   cdc "$t" "$t" copied Xsnapshot_batch=200
   until_ok 30 "active ${t}_copy" || { fail c "the copy did not start"; return; }
@@ -103,7 +103,7 @@ check_d() {
   local t=e2e_kill_$RUN
   table "$t" 0 || { fail d "no table"; return; }
   start_relay count_once killed
-  sink killed
+  write_outputs killed
   cdc "$t" "$t" killed Xsnapshot=never
   until_ok 30 "active $t" || { fail d "the plugin did not stream"; return; }
   (for i in $(seq 1 10000); do echo "INSERT INTO $t VALUES ($i, 'v');"; done |
@@ -126,7 +126,7 @@ check_e() {
   local t=e2e_again_$RUN behind
   table "$t" 0 || { fail e "no table"; return; }
   start_relay count_once again
-  sink again
+  write_outputs again
   cdc "$t" "$t" again Xsnapshot=never
   until_ok 30 "active $t" || { fail e "the plugin did not stream"; return; }
   stop_runner runner

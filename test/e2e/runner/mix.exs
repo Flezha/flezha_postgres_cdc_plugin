@@ -2,8 +2,8 @@ defmodule E2eRunner.MixProject do
   use Mix.Project
 
   # The end-to-end fixture: an Elixir SDK runner whose relays write every
-  # change event they receive, as its identity, on the sink `out`, which a file
-  # sink writes. It is a test, not an example: `test/e2e/run.sh` builds and
+  # change event they receive, as its identity, on the output `out`, which a file
+  # output writes. It is a test, not an example: `test/e2e/run.sh` builds and
   # starts it. The SDK is the one in the core checkout beside this repository.
   def project do
     [
