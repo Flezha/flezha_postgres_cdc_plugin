@@ -92,3 +92,7 @@ holds every row; an effectively-once relay receives every one of 10 000 transact
 a controller killed while they stream; and 50 changes handed over while the runner is away
 reach it once each after the replication connection is cut. It prints PASS or FAIL per check,
 keeps its logs when one fails, and exits non-zero on any failure.
+
+## Licence
+
+Apache-2.0, see `LICENSE`.
