@@ -19,10 +19,10 @@ defmodule FlezhaPostgresCdc.Reader do
   server's error code and message, never a row or the connection's options.
   """
 
+  alias Flezha.Config.Backoff
   alias Flezha.Plugin.Provider.Postgres.Connection
   alias Flezha.Plugin.ProviderBehaviour
   alias Flezha.Process.Watch
-  alias Flezha.SDK.Knob
   alias FlezhaPostgresCdc.Catalog
   alias FlezhaPostgresCdc.Copy
   alias FlezhaPostgresCdc.Stream
@@ -36,7 +36,7 @@ defmodule FlezhaPostgresCdc.Reader do
 
   # The wait before starting over after a failure: from half a second, doubling,
   # to half a minute.
-  @backoff %{base: 500, cap: 30_000, exponent_cap: 8, jitter: true}
+  @backoff %{name: :postgres_cdc_reconnect, base: 500, cap: 30_000, exponent_cap: 8, jitter: true}
 
   # The failures `FlezhaPostgresCdc.Catalog.check/2` names.
   @checked [
@@ -341,14 +341,7 @@ defmodule FlezhaPostgresCdc.Reader do
 
   @doc "The wait before `attempt` (1-based) of the package's backoff curve, announced for `plugin_id`."
   @spec backoff(pos_integer(), binary()) :: non_neg_integer()
-  def backoff(attempt, plugin_id),
-    do:
-      Knob.announce(
-        :postgres_cdc_reconnect,
-        attempt,
-        {@provider, plugin_id},
-        Knob.delay(@backoff, attempt)
-      )
+  def backoff(attempt, plugin_id), do: Backoff.arm(@backoff, attempt, {@provider, plugin_id})
 
   # Connected again clears the failure; the backoff starts over only once the
   # relay takes something, so a refusing relay is not re-fed at once.

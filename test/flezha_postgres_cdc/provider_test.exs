@@ -68,4 +68,22 @@ defmodule FlezhaPostgresCdc.ProviderTest do
     assert args.commit_interval_ms == 5_000 and args.snapshot_batch == 1_000
     assert args.where == "slot=orders_cdc localhost:5432/d"
   end
+
+  test "the wait before a restart climbs from half a second to half a minute, announced" do
+    me = self()
+    id = make_ref()
+    handler = fn _event, measured, meta, _ -> send(me, {:waited, measured, meta}) end
+    :ok = :telemetry.attach(id, [:flezha, :backoff, :wait], handler, nil)
+    on_exit(fn -> :telemetry.detach(id) end)
+
+    target = {:postgres_cdc, "cdc-backoff"}
+
+    for {attempt, low, high} <- [{1, 250, 750}, {9, 15_000, 30_000}] do
+      wait = Reader.backoff(attempt, "cdc-backoff")
+      assert wait in low..high
+
+      assert_receive {:waited, %{delay_ms: ^wait, attempt: ^attempt},
+                      %{ladder: :postgres_cdc_reconnect, target: ^target}}
+    end
+  end
 end
