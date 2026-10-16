@@ -59,14 +59,28 @@ defmodule FlezhaPostgresCdc.ProviderTest do
     end
   end
 
-  test "one reader per binding, keyed by the plugin id, with the defaults of the declaration" do
+  test "one reader per binding, keyed by its namespace and name, with the declaration's defaults" do
     {:ok, prepared} = prepare(@base)
 
-    assert [{"cdc", %{slot: "orders_cdc", snapshot: "initial", batch_size: 500} = args}] =
+    assert [
+             {{:default, "cdc"},
+              %{slot: "orders_cdc", snapshot: "initial", batch_size: 500} = args}
+           ] =
              FlezhaPostgresCdc.worker_specs(prepared)
 
     assert args.commit_interval_ms == 5_000 and args.snapshot_batch == 1_000
     assert args.where == "slot=orders_cdc localhost:5432/d"
+  end
+
+  test "one name in two namespaces is two readers" do
+    keys =
+      for ns <- ["ns_a", "ns_b"] do
+        {:ok, prepared} = prepare(@base, %{source_namespace: ns})
+        [{key, _args}] = FlezhaPostgresCdc.worker_specs(prepared)
+        key
+      end
+
+    assert keys == [{"ns_a", "cdc"}, {"ns_b", "cdc"}]
   end
 
   test "the wait before a restart climbs from half a second to half a minute, announced" do

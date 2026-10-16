@@ -15,6 +15,7 @@ defmodule FlezhaPostgresCdc do
   alias Flezha.Plugin.Extension.Ctx
   alias Flezha.Plugin.Provider.Postgres.Connection
   alias Flezha.Plugin.Provider.PostgresPoll.Query
+  alias Flezha.Plugin.Provider.WorkerSup
   alias Flezha.Plugin.ProviderBehaviour
   alias FlezhaPostgresCdc.Reader
 
@@ -125,7 +126,7 @@ defmodule FlezhaPostgresCdc do
 
   @doc "One reader per binding, started with `FlezhaPostgresCdc.Reader.args/1`."
   @impl true
-  def worker_specs(opts), do: [{opts.plugin_id, Reader.args(opts)}]
+  def worker_specs(opts), do: [{WorkerSup.key(opts), Reader.args(opts)}]
 
   @doc """
   The slot outlives every disable: teardown is the host's. This callback
