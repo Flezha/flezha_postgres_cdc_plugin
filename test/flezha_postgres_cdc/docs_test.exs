@@ -2,22 +2,19 @@ defmodule FlezhaPostgresCdc.DocsTest do
   use ExUnit.Case, async: true
 
   alias Flezha.Plugin.ProviderBehaviour.Options
+  alias FlezhaTest.Helper.SourceWalk
 
-  @page Mix.Project.deps_paths()[:flezha] |> Path.join("docs/public/plugins/postgres_cdc.md")
+  @pages Path.join(Mix.Project.deps_paths()[:flezha], "docs/public/plugins")
 
-  test "the core's postgres_cdc.md carries the option table the provider renders" do
-    rendered = Options.render_options_table(FlezhaPostgresCdc)
+  for {provider, page} <- [{FlezhaPostgresCdc, "postgres_cdc.md"}] do
+    test "the core's #{page} carries the option table #{inspect(provider)} renders" do
+      provider = unquote(provider)
+      page = Path.join(@pages, unquote(page))
+      rendered = Options.render_options_table(provider)
 
-    documented =
-      @page
-      |> File.read!()
-      |> String.split("<!-- provider-options:begin postgres_cdc -->\n")
-      |> Enum.at(1, "")
-      |> String.split("<!-- provider-options:end -->")
-      |> hd()
-
-    assert documented == rendered,
-           "postgres_cdc.md's option table has drifted from its declaration.\n" <>
-             "Replace the block between its provider-options markers with:\n\n" <> rendered
+      assert SourceWalk.block(page, "provider-options", provider.__provider__().name) == rendered,
+             "#{page}'s option table has drifted from #{inspect(provider)}'s declaration.\n" <>
+               "Replace the block between its provider-options markers with:\n\n" <> rendered
+    end
   end
 end
