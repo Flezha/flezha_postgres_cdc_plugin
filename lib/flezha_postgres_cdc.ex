@@ -9,7 +9,7 @@ defmodule FlezhaPostgresCdc do
   shareable, and refused on a partitioned relay, whose members a row's key
   decides between. The slot is kept on every disable, since dropping it loses
   the position. Options, the event, the copy, acknowledgement, health and
-  telemetry: `docs/plugins/postgres_cdc.md` in the core.
+  telemetry: `docs/public/plugins/postgres_cdc.md` in the core.
   """
 
   alias Flezha.Plugin.Extension.Ctx

@@ -8,7 +8,7 @@ channel, in commit order, after a first copy of the published tables taken in th
 snapshot. It confirms the read position as the relay's input durability says.
 
 The contract (database setup, options, the event, the copy, acknowledgement, the slot and its
-lag, health, telemetry) is the core's page `docs/plugins/postgres_cdc.md`; this README covers
+lag, health, telemetry) is the core's page `docs/public/plugins/postgres_cdc.md`; this README covers
 the repository.
 
 ## Layout
@@ -45,7 +45,7 @@ RUSTLER_SKIP_COMPILATION=true mix format --check-formatted
 `mix test` runs with `--no-start`: no controller boots, and the tests start the provider's
 worker family and stand in for the relay. The catalogue test fails when a code the provider
 reports is missing from the core's `flz_transport/errors.json`, and the docs test when the
-option table of `docs/plugins/postgres_cdc.md` differs from the provider's declaration,
+option table of `docs/public/plugins/postgres_cdc.md` differs from the provider's declaration,
 printing the table to put there.
 
 The integration tests need the core's dev database `postgres-cdc` on `localhost:5434`, which

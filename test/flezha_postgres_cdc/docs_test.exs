@@ -3,7 +3,7 @@ defmodule FlezhaPostgresCdc.DocsTest do
 
   alias Flezha.Plugin.ProviderBehaviour.Options
 
-  @page Mix.Project.deps_paths()[:flezha] |> Path.join("docs/plugins/postgres_cdc.md")
+  @page Mix.Project.deps_paths()[:flezha] |> Path.join("docs/public/plugins/postgres_cdc.md")
 
   test "the core's postgres_cdc.md carries the option table the provider renders" do
     rendered = Options.render_options_table(FlezhaPostgresCdc)
