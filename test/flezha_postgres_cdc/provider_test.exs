@@ -4,6 +4,7 @@ defmodule FlezhaPostgresCdc.ProviderTest do
   import FlezhaPostgresCdc.Test.Helpers, only: [prepare: 1, prepare: 2]
 
   alias FlezhaPostgresCdc.Reader
+  alias FlezhaTest.Helper.Telemetry
 
   @base %{
     database: "d",
@@ -84,11 +85,7 @@ defmodule FlezhaPostgresCdc.ProviderTest do
   end
 
   test "the wait before a restart climbs from half a second to half a minute, announced" do
-    me = self()
-    id = make_ref()
-    handler = fn _event, measured, meta, _ -> send(me, {:waited, measured, meta}) end
-    :ok = :telemetry.attach(id, [:flezha, :backoff, :wait], handler, nil)
-    on_exit(fn -> :telemetry.detach(id) end)
+    Telemetry.capture([:flezha, :backoff, :wait], as: :waited)
 
     target = {:postgres_cdc, "cdc-backoff"}
 

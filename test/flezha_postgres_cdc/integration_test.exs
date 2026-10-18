@@ -93,15 +93,6 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
 
   defp health(prepared, pid), do: FlezhaPostgresCdc.health(Map.put(prepared, :owned_pid, pid))
 
-  # Every input taken within `ms` after the last, decoded.
-  defp drain(ms, acc \\ []) do
-    receive do
-      {:ingest, body, metadata} -> drain(ms, [{Jason.decode!(body), metadata} | acc])
-    after
-      ms -> Enum.reverse(acc)
-    end
-  end
-
   defp warnings(fun) do
     Logger.configure(level: :warning)
     capture_log(fun)
@@ -154,7 +145,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
         ])
       end)
 
-      assert [{c, cmd}, {u, umd}, {d, _}] = drain(1_000)
+      assert [{c, cmd}, {u, umd}, {d, _}] = taken(1_000)
       assert {c["op"], u["op"], d["op"]} == {"c", "u", "d"}
       assert [1, 2, 3] == Enum.map([c, u, d], & &1["seq"])
       assert c["lsn"] == u["lsn"] and u["lsn"] == d["lsn"] and c["xid"] == d["xid"]
@@ -183,7 +174,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
 
       sql!(ctx.conn, "TRUNCATE #{ctx.table}")
 
-      assert [{c, _}, {u, _}, {d, _}, {t, tmd}] = drain(1_000)
+      assert [{c, _}, {u, _}, {d, _}, {t, tmd}] = taken(1_000)
       assert c["after"]["notes"] == big
       assert u["before"] == nil and u["unchanged"] == ["notes"]
       assert u["after"] == %{"id" => 1, "status" => "paid"}
@@ -211,7 +202,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
       assert streaming?(ctx)
       sql!(ctx.conn, "INSERT INTO #{ctx.table} VALUES (2, #{row})")
 
-      assert [{copied, cmd}, {streamed, _}] = drain(1_000)
+      assert [{copied, cmd}, {streamed, _}] = taken(1_000)
       assert copied["op"] == "r"
 
       assert cmd["flz.msg_id"] ==
@@ -265,7 +256,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
       assert_receive {:telemetry, @copied, _, _}, 10_000
       assert streaming?(ctx)
       sql!(ctx.conn, "INSERT INTO #{ctx.table} VALUES (4)")
-      assert [1, 2, 3, 4] == Enum.map(drain(1_000), &elem(&1, 0)["after"]["id"])
+      assert [1, 2, 3, 4] == Enum.map(taken(1_000), &elem(&1, 0)["after"]["id"])
 
       ensure_stopped(pid, :shutdown)
       assert [[false]] = Postgrex.query!(ctx.conn, active_sql(), [ctx.slot]).rows
@@ -274,7 +265,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
       # The binding comes back as a new one: nothing it committed survived.
       {_prepared, _pid} = activate(binding, %{overwatcher_pid: host, durable_input: true})
 
-      assert [{%{"op" => "c", "after" => %{"id" => 5}}, _}] = drain(2_000)
+      assert [{%{"op" => "c", "after" => %{"id" => 5}}, _}] = taken(2_000)
     end
   end
 
@@ -327,11 +318,11 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
         end)
 
       assert log =~ "terminating" and log =~ "killed"
-      _ = drain(500)
+      _ = taken(500)
 
       {_prepared, _pid} = activate(binding, %{overwatcher_pid: stand_in_host()})
       assert_receive {:telemetry, @copied, %{count: 3000}, _}, 30_000
-      assert length(drain(500)) == 3000
+      assert length(taken(500)) == 3000
     end
 
     test "a second copy under durable input delivers every row at its value then", ctx do
@@ -342,7 +333,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
       {_prepared, pid} = activate(binding, %{overwatcher_pid: host, durable_input: true})
 
       assert_receive {:telemetry, @copied, _, _}, 10_000
-      assert [{%{"after" => %{"v" => "v1"}}, _}] = drain(500)
+      assert [{%{"after" => %{"v" => "v1"}}, _}] = taken(500)
       ensure_stopped(pid, :shutdown)
 
       # The slot is dropped by hand while the row changes: the next start copies again.
@@ -351,7 +342,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
       {_prepared, _pid} = activate(binding, %{overwatcher_pid: host, durable_input: true})
 
       assert_receive {:telemetry, @copied, _, _}, 10_000
-      assert [{%{"op" => "r", "after" => %{"v" => "v2"}}, _}] = drain(500)
+      assert [{%{"op" => "r", "after" => %{"v" => "v2"}}, _}] = taken(500)
     end
 
     test "a start while the slot's last connection still holds it waits its turn", ctx do
@@ -650,7 +641,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
 
   # The table as the events that arrived so far build it, applied in order.
   defp applied() do
-    events = drain(200)
+    events = taken(200)
     Process.put(:ids, Process.get(:ids, []) ++ Enum.map(events, &elem(&1, 1)["flz.msg_id"]))
     model = Enum.reduce(events, Process.get(:model, %{}), &apply_event/2)
     Process.put(:model, model)

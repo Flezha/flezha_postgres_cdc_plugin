@@ -6,6 +6,7 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
   """
 
   import ExUnit.Callbacks, only: [on_exit: 1]
+  import FlezhaTest.Helper.MessageTestHelper, only: [collect: 2]
 
   alias Flezha.Plugin.Extension.Table.Entry
   alias Flezha.Plugin.Extension.Table.Workers
@@ -101,12 +102,13 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
     host_loop(test, verdict, absorb?)
   end
 
-  @doc "Every input the stand-in host took so far, as `{decoded body, metadata}`."
-  def taken(acc \\ []) do
-    receive do
-      {:ingest, body, metadata} -> taken([{Jason.decode!(body), metadata} | acc])
-    after
-      0 -> Enum.reverse(acc)
+  @doc """
+  Every input the stand-in host took, as `{decoded body, metadata}`: what it
+  took so far, and what it takes within `ms` of the last one.
+  """
+  def taken(ms \\ 0) do
+    collect after: ms do
+      {:ingest, body, metadata} -> {Jason.decode!(body), metadata}
     end
   end
 end
