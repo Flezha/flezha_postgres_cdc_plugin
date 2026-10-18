@@ -25,7 +25,18 @@ defmodule FlezhaPostgresCdc.MixProject do
     [env: [flezha_providers: %{"postgres_cdc" => FlezhaPostgresCdc}]]
   end
 
-  defp elixirc_paths(:test), do: ["lib", "test/support"]
+  # The core's shared test helpers it uses: a dependency compiles its `lib`
+  # alone, and Mix takes a source outside the project only by absolute path.
+  defp elixirc_paths(:test) do
+    core_helpers = ~w(node_test_helper telemetry)
+
+    [
+      "lib",
+      "test/support"
+      | Enum.map(core_helpers, &Path.expand("../../test/helpers/#{&1}.ex", __DIR__))
+    ]
+  end
+
   defp elixirc_paths(_env), do: ["lib"]
 
   # The driver is the one the controller release ships, pinned to its version,

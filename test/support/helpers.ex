@@ -1,8 +1,8 @@
 defmodule FlezhaPostgresCdc.Test.Helpers do
   @moduledoc """
-  What the package's tests need from a running controller and nothing more: a
-  poll, a telemetry capture, a plugin prepared and activated as the extension
-  table does it, a stand-in relay, and the dev database.
+  What the package's tests need beyond the core's shared helpers: a plugin
+  prepared and activated as the extension table does it, a stand-in relay, and
+  the dev database.
   """
 
   import ExUnit.Callbacks, only: [on_exit: 1]
@@ -10,6 +10,7 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
   alias Flezha.Plugin.Extension.Table.Entry
   alias Flezha.Plugin.Extension.Table.Workers
   alias Flezha.Plugin.ProviderBehaviour.Options
+  alias FlezhaTest.Helper.NodeTestHelper
 
   @doc "Where the dev stack's `postgres-cdc` listens, and who the tests connect as."
   def database,
@@ -31,48 +32,6 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
 
   @doc "Run each statement of `sqls` on `conn`."
   def sql!(conn, sqls), do: Enum.map(List.wrap(sqls), &Postgrex.query!(conn, &1, []))
-
-  @doc "Poll `fun` every `interval_ms` until it is truthy or `timeout_ms` passes."
-  def wait_until(fun, timeout_ms, interval_ms \\ 50) do
-    deadline = System.monotonic_time(:millisecond) + timeout_ms
-    poll(fun, deadline, interval_ms)
-  end
-
-  defp poll(fun, deadline, interval_ms) do
-    case fun.() do
-      falsy when falsy in [nil, false] ->
-        if System.monotonic_time(:millisecond) >= deadline do
-          falsy
-        else
-          Process.sleep(interval_ms)
-          poll(fun, deadline, interval_ms)
-        end
-
-      truthy ->
-        truthy
-    end
-  end
-
-  @doc """
-  Forward every emission of `events` to the calling process as
-  `{:telemetry, event, measurements, metadata}` until the test exits.
-  """
-  def capture(events) do
-    test_pid = self()
-    handler_id = {__MODULE__, events, System.unique_integer([:positive])}
-
-    :ok =
-      :telemetry.attach_many(
-        handler_id,
-        events,
-        fn event, measurements, metadata, _config ->
-          send(test_pid, {:telemetry, event, measurements, metadata})
-        end,
-        nil
-      )
-
-    on_exit(fn -> :telemetry.detach(handler_id) end)
-  end
 
   @doc "The options the provider prepares from `opts`, as the extension table builds them."
   def prepare(opts, host \\ %{}) do
@@ -110,15 +69,8 @@ defmodule FlezhaPostgresCdc.Test.Helpers do
       )
 
     pid = Entry.owned_pid(started.entries[plugin_id])
-    on_exit(fn -> stop(pid) end)
+    on_exit(fn -> NodeTestHelper.ensure_stopped(pid, :shutdown) end)
     {prepared, pid}
-  end
-
-  @doc "Stop the worker `pid`, as its supervisor would, if it is still alive."
-  def stop(pid) do
-    GenServer.stop(pid, :shutdown)
-  catch
-    :exit, _gone -> :ok
   end
 
   @doc """

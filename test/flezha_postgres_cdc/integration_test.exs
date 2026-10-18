@@ -12,6 +12,8 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
 
   import ExUnit.CaptureLog
   import FlezhaPostgresCdc.Test.Helpers
+  import FlezhaTest.Helper.NodeTestHelper, only: [ensure_stopped: 2, wait_until: 2]
+  import FlezhaTest.Helper.Telemetry
 
   alias FlezhaPostgresCdc.Catalog
 
@@ -265,7 +267,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
       sql!(ctx.conn, "INSERT INTO #{ctx.table} VALUES (4)")
       assert [1, 2, 3, 4] == Enum.map(drain(1_000), &elem(&1, 0)["after"]["id"])
 
-      stop(pid)
+      ensure_stopped(pid, :shutdown)
       assert [[false]] = Postgrex.query!(ctx.conn, active_sql(), [ctx.slot]).rows
       sql!(ctx.conn, "INSERT INTO #{ctx.table} VALUES (5)")
 
@@ -341,7 +343,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
 
       assert_receive {:telemetry, @copied, _, _}, 10_000
       assert [{%{"after" => %{"v" => "v1"}}, _}] = drain(500)
-      stop(pid)
+      ensure_stopped(pid, :shutdown)
 
       # The slot is dropped by hand while the row changes: the next start copies again.
       sql!(ctx.conn, "UPDATE #{ctx.table} SET v = 'v2'")
@@ -421,7 +423,7 @@ defmodule FlezhaPostgresCdc.IntegrationTest do
 
           assert pub == ctx.publication
           assert [] = Postgrex.query!(ctx.conn, active_sql(), [ctx.slot]).rows
-          stop(pid)
+          ensure_stopped(pid, :shutdown)
         end)
 
       assert log =~ "postgres_cdc_publication_missing"
