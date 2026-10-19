@@ -9,12 +9,13 @@ defmodule FlezhaPostgresCdc.DocsTest do
   for {provider, page} <- [{FlezhaPostgresCdc, "postgres_cdc.md"}] do
     test "the core's #{page} carries the option table #{inspect(provider)} renders" do
       provider = unquote(provider)
-      page = Path.join(@pages, unquote(page))
-      rendered = Options.render_options_table(provider)
 
-      assert SourceWalk.block(page, "provider-options", provider.__provider__().name) == rendered,
-             "#{page}'s option table has drifted from #{inspect(provider)}'s declaration.\n" <>
-               "Replace the block between its provider-options markers with:\n\n" <> rendered
+      SourceWalk.assert_block(
+        Path.join(@pages, unquote(page)),
+        "provider-options",
+        provider.__provider__().name,
+        Options.render_options_table(provider)
+      )
     end
   end
 end
