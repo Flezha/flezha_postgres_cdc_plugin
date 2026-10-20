@@ -21,13 +21,16 @@ defmodule FlezhaPostgresCdc.Reader do
 
   alias Flezha.Config.Backoff
   alias Flezha.Plugin.Provider.Postgres.Connection
+  alias Flezha.Plugin.Provider.Worker
   alias Flezha.Plugin.ProviderBehaviour
-  alias Flezha.Process.Watch
   alias FlezhaPostgresCdc.Catalog
   alias FlezhaPostgresCdc.Copy
   alias FlezhaPostgresCdc.Stream
 
-  use GenServer
+  # The facts the provider's `health/1` judges: the failure the plugin is
+  # unhealthy with, the run of refused hand-overs and its last error, and the
+  # slot's lag.
+  use Worker, facts: [:failure, :consecutive_failures, :last_error, :lag_bytes]
   use Flezha.Process.Timer, keys: [:start, :lag]
 
   require Logger
@@ -45,11 +48,6 @@ defmodule FlezhaPostgresCdc.Reader do
     :postgres_cdc_publication_missing,
     :postgres_cdc_replica_identity_missing
   ]
-
-  @doc "Started by the extension table at activation, from the declared spec."
-  @spec start_link(map()) :: GenServer.on_start()
-  def start_link(args) when is_map(args),
-    do: GenServer.start_link(__MODULE__, args, name: Map.fetch!(args, :name))
 
   @doc """
   The reader's start arguments, from the plugin's prepared options: the normal
@@ -83,13 +81,6 @@ defmodule FlezhaPostgresCdc.Reader do
     })
   end
 
-  @doc """
-  The facts the provider's `health/1` judges: the failure the plugin is
-  unhealthy with, the run of failures and its last error, and the slot's lag.
-  """
-  @spec probe(pid()) :: {:ok, map()} | :timeout
-  def probe(pid), do: ProviderBehaviour.ask(pid, :health_probe)
-
   @impl true
   def init(args) do
     # A stop closes both connections, which only a trapped shutdown reaches.
@@ -100,19 +91,16 @@ defmodule FlezhaPostgresCdc.Reader do
         state =
           args
           |> Map.drop([:name, :conn_opts])
+          |> Map.merge(Worker.fields(args))
           |> Map.merge(%{
             conn: conn,
-            watch: Watch.watch(Watch.new(), args.overwatcher_pid, :host),
             published: [],
             stream_mode: nil,
             stream: nil,
             tasks: %{},
             failure: nil,
             attempt: 0,
-            refusals: 0,
-            last_error: nil,
-            lag_bytes: nil,
-            timers: %{}
+            lag_bytes: nil
           })
 
         # Scheduled, never run here: activation is synchronous in the host.
@@ -162,7 +150,7 @@ defmodule FlezhaPostgresCdc.Reader do
          done(%{state | tasks: Map.delete(state.tasks, kind)}, kind, {:error, {:exit, reason}})}
 
       nil ->
-        host_down(state, ref)
+        {:noreply, state}
     end
   end
 
@@ -172,11 +160,6 @@ defmodule FlezhaPostgresCdc.Reader do
   def handle_info({:EXIT, conn, reason}, %{conn: conn} = state),
     do: {:stop, {:connection_exit, reason}, state}
 
-  def handle_info({:health_probe, from, ref}, state) do
-    send(from, {ref, Map.take(state, [:failure, :refusals, :last_error, :lag_bytes])})
-    {:noreply, state}
-  end
-
   def handle_info(_other, state), do: {:noreply, state}
 
   @impl true
@@ -185,14 +168,6 @@ defmodule FlezhaPostgresCdc.Reader do
     if state.stream, do: Process.exit(state.stream, :kill)
     Process.exit(state.conn, :shutdown)
     :ok
-  end
-
-  # The relay this reader feeds is gone.
-  defp host_down(state, ref) do
-    case Watch.down(state.watch, ref) do
-      {[:host], _watch} -> {:stop, :normal, state}
-      _stale -> {:noreply, state}
-    end
   end
 
   # ---------- children ----------
@@ -314,8 +289,7 @@ defmodule FlezhaPostgresCdc.Reader do
   end
 
   defp refused(state, reason) do
-    %{state | refusals: state.refusals + 1, last_error: "ingest refused: #{inspect(reason)}"}
-    |> retry()
+    state |> Worker.failed("ingest refused: #{inspect(reason)}") |> retry()
   end
 
   defp unwrap({:shutdown, reason}), do: unwrap(reason)
@@ -331,7 +305,7 @@ defmodule FlezhaPostgresCdc.Reader do
     )
 
     emit(:failed, %{count: 1}, Map.put(labels(state), :reason, error))
-    %{state | refusals: state.refusals + 1, last_error: error}
+    Worker.failed(state, error)
   end
 
   defp retry(state) do
@@ -346,7 +320,7 @@ defmodule FlezhaPostgresCdc.Reader do
   # Connected again clears the failure; the backoff starts over only once the
   # relay takes something, so a refusing relay is not re-fed at once.
   defp recovered(state, :failure), do: %{state | failure: nil}
-  defp recovered(state, :taken), do: %{state | refusals: 0, last_error: nil, attempt: 0}
+  defp recovered(state, :taken), do: Worker.recovered(%{state | attempt: 0})
 
   defp stop_stream(%{stream: nil} = state), do: state
 

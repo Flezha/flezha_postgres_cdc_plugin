@@ -12,17 +12,15 @@ defmodule FlezhaPostgresCdc do
   telemetry: `docs/public/plugins/postgres_cdc.md` in the core.
   """
 
-  alias Flezha.Plugin.Extension.Ctx
   alias Flezha.Plugin.Provider.Postgres.Connection
-  alias Flezha.Plugin.Provider.WorkerSup
   alias Flezha.Plugin.ProviderBehaviour
   alias Flezha.Plugin.ProviderBehaviour.Options
   alias FlezhaPostgresCdc.Reader
 
   use ProviderBehaviour,
     name: "postgres_cdc",
-    feeds: true,
     shareable: false,
+    source: [partitioned: :refuse],
     telemetry: [lag_bytes: :metric, snapshot_done: :event],
     options:
       Connection.rows() ++
@@ -82,14 +80,7 @@ defmodule FlezhaPostgresCdc do
   @doc "Validate and prepare. Connects to nothing: the reader does, at activation."
   @impl true
   def init_provider(opts) do
-    with :ok <- ProviderBehaviour.require_entry_channel(opts, __MODULE__),
-         :ok <- ProviderBehaviour.refuse_partitioned(opts, __MODULE__),
-         :ok <- check_names(opts) do
-      {:ok,
-       opts
-       |> Connection.prepare()
-       |> Map.put(:plugin_id, opts.plugin_id || opts[:source_plugin_id])}
-    end
+    with :ok <- check_names(opts), do: {:ok, Connection.prepare(opts)}
   end
 
   defp check_names(opts) do
@@ -105,42 +96,8 @@ defmodule FlezhaPostgresCdc do
     if Regex.match?(@slot, slot), do: :ok, else: ProviderBehaviour.refuse_value(:slot, slot)
   end
 
-  @doc "One reader per binding, started with `FlezhaPostgresCdc.Reader.args/1`."
-  @impl true
-  def worker_specs(opts), do: [{WorkerSup.key(opts), Reader.args(opts)}]
-
-  @doc """
-  The slot outlives every disable: teardown is the host's. This callback
-  exists so the provider can be hooked at all: every hook requires the matching
-  export.
-  """
-  @impl true
-  def on_terminate(%Ctx.Terminate{}, _opts), do: :ok
-
-  @doc """
-  Health verdict from the reader: a failed start check or a lost connection
-  names itself, then a slot past `max_lag_bytes` names its lag, then
-  `failure_threshold` refused hand-overs in a row name the refusal.
-  """
-  @impl true
-  @spec health(map()) :: ProviderBehaviour.health_verdict()
-  def health(opts) do
-    ProviderBehaviour.worker_health(
-      opts,
-      [
-        absent: :no_reader,
-        dead: :reader_dead,
-        budget_ms: 2 * ProviderBehaviour.probe_budget_ms()
-      ],
-      fn pid ->
-        case Reader.probe(pid) do
-          {:ok, facts} -> verdict(facts, opts)
-          :timeout -> {:fail_open, :probe_timeout}
-        end
-      end
-    )
-  end
-
+  # Before the source's shared verdicts: a failed start check or a lost
+  # connection names itself, then a slot past `max_lag_bytes` names its lag.
   defp verdict(%{failure: failure}, _opts) when failure != nil, do: {:unhealthy, failure}
 
   # The log a slot holds back fills the database server's disk: it outranks a
@@ -150,11 +107,6 @@ defmodule FlezhaPostgresCdc do
       {:unhealthy,
        {:postgres_cdc_slot_lag,
         %{slot: opts.slot, lag_bytes: bytes, max_lag_bytes: opts.max_lag_bytes}}}
-
-  defp verdict(%{refusals: n, last_error: error}, opts) when n >= opts.failure_threshold,
-    do: {:unhealthy, {:read_failed, error}}
-
-  defp verdict(_facts, _opts), do: :healthy
 
   @doc "What `flz relay info` shows beneath the plugin: the slot, the publication and its verdict."
   @impl true
