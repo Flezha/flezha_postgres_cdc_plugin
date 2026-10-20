@@ -28,7 +28,7 @@ defmodule FlezhaPostgresCdc.Stream do
   use Postgrex.ReplicationConnection
 
   alias Flezha.Plugin.Host
-  alias Flezha.Plugin.Provider.PostgresPoll.Query
+  alias Flezha.Plugin.Provider.Postgres.Connection
   alias Flezha.Plugin.ProviderBehaviour
   alias FlezhaPostgresCdc.Event
   alias FlezhaPostgresCdc.Pgoutput
@@ -109,7 +109,7 @@ defmodule FlezhaPostgresCdc.Stream do
 
     query =
       "START_REPLICATION SLOT #{state.slot} LOGICAL 0/0 " <>
-        "(proto_version '1', publication_names '#{Query.quote_name(state.publication)}')"
+        "(proto_version '1', publication_names '#{Connection.quote_name(state.publication)}')"
 
     {:stream, query, [], state}
   end
@@ -180,9 +180,9 @@ defmodule FlezhaPostgresCdc.Stream do
   # A relation's columns with the kinds the catalog reads them as, which the
   # copy read them with too.
   defp kinds(relation, state) do
-    case Query.catalog(state.conn, relation.schema, relation.table) do
+    case Connection.catalog(state.conn, relation.schema, relation.table) do
       {:ok, %{rows: rows}} ->
-        kinds = Map.new(Query.kinds(rows))
+        kinds = Map.new(Connection.kinds(rows))
         columns = Enum.map(relation.columns, &Map.put(&1, :kind, Map.get(kinds, &1.name, :text)))
         %{relation | columns: columns}
 

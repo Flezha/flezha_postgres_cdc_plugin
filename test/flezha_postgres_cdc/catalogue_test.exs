@@ -13,9 +13,6 @@ defmodule FlezhaPostgresCdc.CatalogueTest do
 
   test "every reason the provider gives maps to its code" do
     for {reason, code} <- [
-          {{:partitioned_host, %{provider: "postgres_cdc", relay: "op"}},
-           "plugin.partitioned_host"},
-          {{:invalid_option_value, :slot, "Bad"}, "plugin.option_invalid"},
           {{:postgres_cdc_wal_level_not_logical, %{wal_level: "replica"}},
            "postgres_cdc.wal_level_not_logical"},
           {{:postgres_cdc_server_too_old, %{version: "13.4"}}, "postgres_cdc.server_too_old"},

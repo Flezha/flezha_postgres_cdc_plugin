@@ -1,7 +1,7 @@
 defmodule FlezhaPostgresCdc.Values do
   @moduledoc """
   A streamed column's text form parsed into the term the driver decodes for
-  the same column, so `Flezha.Plugin.Provider.PostgresPoll.Query.encode/2`
+  the same column, so `Flezha.Plugin.Provider.Postgres.Connection.encode/2`
   writes a streamed row exactly as it writes the copied one.
 
   The column's kind is the catalog's, as the poll source reads it: `:value`

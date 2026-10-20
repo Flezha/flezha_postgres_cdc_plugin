@@ -13,7 +13,7 @@ defmodule FlezhaPostgresCdc.Copy do
   transaction holds back vacuum on the whole database while it runs.
   """
 
-  alias Flezha.Plugin.Provider.PostgresPoll.Query
+  alias Flezha.Plugin.Provider.Postgres.Connection
   alias FlezhaPostgresCdc.Event
   alias FlezhaPostgresCdc.Reader
 
@@ -44,21 +44,21 @@ defmodule FlezhaPostgresCdc.Copy do
 
   defp table!(tx, table, lsn, spec) do
     columns =
-      case Query.catalog(tx, table.schema, table.table) do
-        {:ok, %{rows: rows}} -> Query.kinds(rows)
+      case Connection.catalog(tx, table.schema, table.table) do
+        {:ok, %{rows: rows}} -> Connection.kinds(rows)
         {:error, reason} -> DBConnection.rollback(tx, reason)
       end
 
     # The key is named through the alias `r`, so ORDER BY reads the table's
     # column, never the selected one of the same name.
-    keys = Enum.map(table.key, &"r.#{Query.quote_name(&1)}")
+    keys = Enum.map(table.key, &"r.#{Connection.quote_name(&1)}")
     order = if keys == [], do: "", else: " ORDER BY " <> Enum.join(keys, ", ")
 
-    select = Enum.join([Query.select_list(columns) | Enum.map(keys, &"#{&1}::text")], ", ")
+    select = Enum.join([Connection.select_list(columns) | Enum.map(keys, &"#{&1}::text")], ", ")
 
     run!(
       tx,
-      "DECLARE #{@cursor} NO SCROLL CURSOR FOR SELECT #{select} FROM #{Query.relation(table.schema, table.table)} r#{order}"
+      "DECLARE #{@cursor} NO SCROLL CURSOR FOR SELECT #{select} FROM #{Connection.relation(table.schema, table.table)} r#{order}"
     )
 
     count = fetch!(tx, table, columns, {lsn, 0}, spec)

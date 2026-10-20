@@ -6,7 +6,7 @@ defmodule FlezhaPostgresCdc.ValuesTest do
   """
   use ExUnit.Case, async: true
 
-  alias Flezha.Plugin.Provider.PostgresPoll.Query
+  alias Flezha.Plugin.Provider.Postgres.Connection
   alias FlezhaPostgresCdc.Values
 
   test "every type of the poll source's encoding, from its text, becomes the same JSON" do
@@ -35,7 +35,7 @@ defmodule FlezhaPostgresCdc.ValuesTest do
     values =
       for {_, kind, type, typmod, text} <- cells, do: Values.parse(kind, type, typmod, text)
 
-    assert Query.encode(columns, values) ==
+    assert Connection.encode(columns, values) ==
              ~s|{"i":42,"f":1.5,"nan":"NaN","inf":"-Infinity","b":true,"n":"12.3400",| <>
                ~s|"at":"2026-10-02T12:30:00.123456Z","day":"2026-10-02","t":"12:30:00.000000",| <>
                ~s|"local":"2026-10-02T12:30:00","u":"6f1c3a52-6f0a-4f43-9a41-0d8f8c2e7b11",| <>

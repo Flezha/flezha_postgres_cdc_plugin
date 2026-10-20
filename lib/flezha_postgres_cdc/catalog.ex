@@ -6,12 +6,12 @@ defmodule FlezhaPostgresCdc.Catalog do
   read into, and how much log it holds back.
 
   Every name in a statement was validated and is quoted
-  (`Flezha.Plugin.Provider.PostgresPoll.Query`); every value is a parameter.
+  (`Flezha.Plugin.Provider.Postgres.Connection`); every value is a parameter.
   A failure the plugin reports as unhealthy is `{tag, details}`, a reason of
   the core's error catalogue.
   """
 
-  alias Flezha.Plugin.Provider.PostgresPoll.Query
+  alias Flezha.Plugin.Provider.Postgres.Connection
 
   @settings "SELECT current_setting('wal_level'), current_setting('server_version_num')::int, " <>
               "current_setting('server_version')"
@@ -94,7 +94,7 @@ defmodule FlezhaPostgresCdc.Catalog do
 
   defp create_publication(conn, spec, false) do
     sql =
-      "CREATE PUBLICATION #{Query.quote_name(spec.publication)} FOR TABLE " <>
+      "CREATE PUBLICATION #{Connection.quote_name(spec.publication)} FOR TABLE " <>
         Enum.map_join(spec.tables, ", ", &relation/1)
 
     with {:ok, _} <- query(conn, sql, []), do: :ok
@@ -102,8 +102,8 @@ defmodule FlezhaPostgresCdc.Catalog do
 
   # A table as `tables` writes it, `name` or `schema.name`, quoted.
   defp relation(written) do
-    {schema, table} = Query.split_table(written)
-    Query.relation(schema, table)
+    {schema, table} = Connection.split_table(written)
+    Connection.relation(schema, table)
   end
 
   defp tables(conn, names) do

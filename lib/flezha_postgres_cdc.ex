@@ -14,9 +14,9 @@ defmodule FlezhaPostgresCdc do
 
   alias Flezha.Plugin.Extension.Ctx
   alias Flezha.Plugin.Provider.Postgres.Connection
-  alias Flezha.Plugin.Provider.PostgresPoll.Query
   alias Flezha.Plugin.Provider.WorkerSup
   alias Flezha.Plugin.ProviderBehaviour
+  alias Flezha.Plugin.ProviderBehaviour.Options
   alias FlezhaPostgresCdc.Reader
 
   use ProviderBehaviour,
@@ -27,17 +27,6 @@ defmodule FlezhaPostgresCdc do
     options:
       Connection.rows() ++
         [
-          channel: [
-            type: :names,
-            doc:
-              "The channel this plugin is attached to: the entry channel every change is injected on, and one name. Required, unless `channel_in` names it"
-          ],
-          channel_in: [
-            type: :names,
-            doc:
-              "Entry channel every change is injected on, and one name; the explicit spelling of `channel`. Required, unless `channel` names it"
-          ],
-          plugin_id: [type: :string, doc: "Plugin id; defaults to the id it was enabled under"],
           slot: [
             type: :string,
             required: true,
@@ -81,22 +70,14 @@ defmodule FlezhaPostgresCdc do
             default: 30_000,
             min: 1,
             doc: "How often the slot's lag is read"
-          ],
-          failure_threshold: [
-            type: :int,
-            default: 3,
-            min: 1,
-            doc: "Refused hand-overs in a row before the plugin reports unhealthy"
           ]
-        ],
+        ] ++
+        Options.channel(:in, "change") ++
+        Options.plugin_id("the id it was enabled under") ++ Options.failure_threshold(),
     worker: [module: Reader, restart: :temporary]
 
   # A slot name as Postgres allows it, with room for the copy's `_copy`.
   @slot ~r/\A[a-z0-9_]{1,58}\z/
-
-  # A channel written as an atom, which an Elixir-side spec may carry.
-  defp convert_value(field, value) when field in [:channel, :channel_in] and is_atom(value),
-    do: convert_value(field, Atom.to_string(value))
 
   @doc "Validate and prepare. Connects to nothing: the reader does, at activation."
   @impl true
@@ -113,9 +94,9 @@ defmodule FlezhaPostgresCdc do
 
   defp check_names(opts) do
     with :ok <- slot(opts.slot) do
-      Query.check_names([
+      Connection.check_names([
         {:publication, opts.publication, [opts.publication]},
-        {:tables, opts.tables, Enum.flat_map(opts.tables || [], &Query.table_names/1)}
+        {:tables, opts.tables, Enum.flat_map(opts.tables || [], &Connection.table_names/1)}
       ])
     end
   end

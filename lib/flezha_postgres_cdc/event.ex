@@ -4,14 +4,14 @@ defmodule FlezhaPostgresCdc.Event do
 
   The payload is one JSON object: `op`, `schema`, `table`, `before`, `after`,
   `unchanged`, `lsn`, `xid`, `commit_time` and `seq` (a truncate carries
-  `tables` in place of a row). A row's values are written by the poll
-  source's `Query.encode/2`: a copied row from the terms the driver decoded,
+  `tables` in place of a row). A row's values are written by
+  `Flezha.Plugin.Provider.Postgres.Connection.encode/2`: a copied row from the terms the driver decoded,
   a streamed one from its text parsed by `FlezhaPostgresCdc.Values`. The
   metadata carries the entry channel, `flz.msg_id`, `pg.table` and `pg.op`.
   """
 
   alias Flezha.Plugin.Host
-  alias Flezha.Plugin.Provider.PostgresPoll.Query
+  alias Flezha.Plugin.Provider.Postgres.Connection
   alias FlezhaPostgresCdc.Catalog
   alias FlezhaPostgresCdc.Pgoutput
   alias FlezhaPostgresCdc.Values
@@ -133,5 +133,5 @@ defmodule FlezhaPostgresCdc.Event do
      Enum.map(unchanged, &elem(&1, 0).name)}
   end
 
-  defp fragment(columns, values), do: Jason.Fragment.new(Query.encode(columns, values))
+  defp fragment(columns, values), do: Jason.Fragment.new(Connection.encode(columns, values))
 end
