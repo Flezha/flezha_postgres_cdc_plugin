@@ -11,10 +11,15 @@ defmodule FlezhaPostgresCdc.Event do
   """
 
   alias Flezha.Plugin.Host
+  alias Flezha.Plugin.Host.MsgId
   alias Flezha.Plugin.Provider.Postgres.Connection
+  alias Flezha.Relay.Ingest.Verdict
   alias FlezhaPostgresCdc.Catalog
   alias FlezhaPostgresCdc.Pgoutput
   alias FlezhaPostgresCdc.Values
+
+  require MsgId
+  require Verdict
 
   # How long one hand-over waits for the relay's verdicts. Well under the
   # server's `wal_sender_timeout` (60 s by default), which ends a replication
@@ -59,8 +64,8 @@ defmodule FlezhaPostgresCdc.Event do
 
   @doc """
   Hand `inputs` to the relay and wait for every verdict: `:ok` when it took
-  them all, else the first refusal. A hand-over that outlasts its timeout is a
-  refusal.
+  them all (`Flezha.Relay.Ingest.Verdict.taken?/1`), else the first refusal.
+  A hand-over that outlasts its timeout is a refusal.
   """
   @spec hand_over([{binary(), map()}], map()) :: :ok | {:error, term()}
   def hand_over([], _spec), do: :ok
@@ -68,7 +73,7 @@ defmodule FlezhaPostgresCdc.Event do
   def hand_over(inputs, spec) do
     spec.overwatcher_pid
     |> Host.inject_many(inputs, :verdict, @inject_timeout_ms)
-    |> Enum.find(:ok, &(&1 != :ok))
+    |> Enum.find(:ok, &(not Verdict.taken?(&1)))
   end
 
   # One row's event, copied or streamed: the same fields in the same order.
@@ -96,12 +101,11 @@ defmodule FlezhaPostgresCdc.Event do
 
   defp input(fields, id, table, op, spec) do
     {Jason.encode!(Jason.OrderedObject.new(fields)),
-     %{
-       "channel" => spec.entry_channel,
-       "flz.msg_id" => "#{spec.plugin_id}/#{id}",
-       "pg.table" => table,
-       "pg.op" => op
-     }}
+     MsgId.stamp(
+       %{"channel" => spec.entry_channel, "pg.table" => table, "pg.op" => op},
+       spec.plugin_id,
+       id
+     )}
   end
 
   # The key columns of a key tuple, every column of a full old row.
