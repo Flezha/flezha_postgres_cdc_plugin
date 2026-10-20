@@ -39,7 +39,7 @@ defmodule E2eRunner do
     def run(input, seen, ctx) do
       id = E2eRunner.identity(input)
       seen = Map.update(seen, id, 1, &(&1 + 1))
-      :ok = emit_keyed(ctx, id, "#{id} #{seen[id]}")
+      :ok = emit(ctx, "#{id} #{seen[id]}", key: id)
       {:ok, seen}
     end
   end
