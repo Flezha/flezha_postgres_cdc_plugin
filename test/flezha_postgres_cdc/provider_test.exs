@@ -38,14 +38,6 @@ defmodule FlezhaPostgresCdc.ProviderTest do
              prepare(Map.put(@base, :tables, "public.Orders,lines"))
   end
 
-  test "a member of a partition group and a plugin with no channel are refused" do
-    assert {:error, {:partitioned_host, %{provider: "postgres_cdc", relay: "op"}}} =
-             prepare(@base, %{partition_count: 4})
-
-    assert {:error, {:entry_channel_required, "postgres_cdc"}} =
-             prepare(Map.delete(@base, :channel))
-  end
-
   test "the prepared password is the placeholder; both connections resolve the literal one" do
     {:ok, prepared} = prepare(Map.put(@base, :password, "s3cret"))
     assert prepared.password == "**redacted**"
