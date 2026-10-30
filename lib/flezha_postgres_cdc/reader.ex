@@ -289,7 +289,7 @@ defmodule FlezhaPostgresCdc.Reader do
   end
 
   defp refused(state, reason) do
-    state |> Worker.failed("ingest refused: #{inspect(reason)}") |> retry()
+    state |> Worker.failed("ingest refused: #{inspect(reason)}", subject(state)) |> retry()
   end
 
   defp unwrap({:shutdown, reason}), do: unwrap(reason)
@@ -305,7 +305,7 @@ defmodule FlezhaPostgresCdc.Reader do
     )
 
     emit(:failed, %{count: 1}, Map.put(labels(state), :reason, error))
-    Worker.failed(state, error)
+    Worker.failed(state, error, subject(state))
   end
 
   defp retry(state) do
@@ -320,7 +320,9 @@ defmodule FlezhaPostgresCdc.Reader do
   # Connected again clears the failure; the backoff starts over only once the
   # relay takes something, so a refusing relay is not re-fed at once.
   defp recovered(state, :failure), do: %{state | failure: nil}
-  defp recovered(state, :taken), do: Worker.recovered(%{state | attempt: 0})
+  defp recovered(state, :taken), do: Worker.recovered(%{state | attempt: 0}, subject(state))
+
+  defp subject(state), do: "[FlezhaPostgresCdc] #{state.where}"
 
   defp stop_stream(%{stream: nil} = state), do: state
 
