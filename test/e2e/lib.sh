@@ -41,7 +41,8 @@ cdc() {
     { cat "$TMP/out/enable-$name.log" "$TMP/out/bind-$name.log"; exit 1; }
 }
 
-# `write_outputs <relay>`: a file output plugin writing the relay's outputs to `<relay>.out`.
+# `write_outputs <relay>`: a file output plugin writing the relay's outputs to `<relay>.out`, in the
+# default namespace's folder under the root.
 write_outputs() {
   flz plugin enable "$1_out" relay_file_output "Xpath=$1.out" >>"$TMP/out/enable-$1_out.log" 2>&1 &&
     flz plugin bind "$1_out" --relay_id "$1" --hook=on_output >>"$TMP/out/bind-$1_out.log" 2>&1 ||
@@ -49,8 +50,8 @@ write_outputs() {
 }
 
 # The distinct identities the relay wrote, and the most times it saw any one.
-ids() { cut -d' ' -f1 "$FLEZHA_FILE_PLUGIN_ROOT/$1.out" 2>/dev/null | sort -u | wc -l; }
-most_seen() { cut -d' ' -f2 "$FLEZHA_FILE_PLUGIN_ROOT/$1.out" 2>/dev/null | sort -n | tail -1; }
+ids() { cut -d' ' -f1 "$FLEZHA_FILE_PLUGIN_ROOT/default/$1.out" 2>/dev/null | sort -u | wc -l; }
+most_seen() { cut -d' ' -f2 "$FLEZHA_FILE_PLUGIN_ROOT/default/$1.out" 2>/dev/null | sort -n | tail -1; }
 
 # `await_ids <relay> <n> [seconds]`: wait until the relay wrote `n` identities.
 await_ids() { until_ok "${3:-60}" "[ \"\$(ids $1)\" -ge $2 ]"; }
