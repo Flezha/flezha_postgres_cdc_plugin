@@ -52,8 +52,8 @@ start_runner runner default
 
 check_a() {
   local lib
-  lib=$(tar -tzf "$TMP/flezha_postgres_cdc-0.1.0.fpz" | grep '^lib/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
-  if [ "$lib" = "flezha_postgres_cdc-0.1.0 " ] && flz plugin list --installed | grep -q 'flezha_postgres_cdc.* loaded'; then
+  lib=$(tar -tzf "$TMP/flezha_postgres_cdc-0.1.1.fpz" | grep '^lib/' | cut -d/ -f2 | sort -u | tr '\n' ' ')
+  if [ "$lib" = "flezha_postgres_cdc-0.1.1 " ] && flz plugin list --installed | grep -q 'flezha_postgres_cdc.* loaded'; then
     pass a "the package loaded; its archive's lib/ holds only $lib"
   else
     fail a "archive lib/: $lib; $(flz plugin list --installed 2>&1 | tail -2)"
